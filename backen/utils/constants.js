@@ -1,0 +1,14 @@
+exports.PRODUCT_STATUS={
+    ON_SALE:'ON_SALE',
+    OFF_SALE:'OFF_SALE',
+    SOLD:'SOLD',
+    PENDING_SALE:'PENDING_SALE'
+}
+
+exports.MESSAGE_TYPE={
+    ORDER:'ORDER',
+    CHAT:'CHAT',
+    SYSTEM:'SYSTEM'
+}
+
+exports.SYSTEM_ID='f1d0fe4d-b42c-42e9-8fb6-55e18a1eb2ff';
