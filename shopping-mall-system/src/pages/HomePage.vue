@@ -34,23 +34,38 @@
         @mouseleave="handleCarouselHover(false)"
         :class="{ 'carousel-hover': isCarouselHovered }"
       >
-        <el-carousel-item v-for="(slide, index) in carouselSlides" :key="slide.categoryId || index">
+        <el-carousel-item
+          v-for="(slide, index) in carouselSlides"
+          :key="slide.categoryId || index"
+        >
           <img
             :src="slide.image"
             class="carousel-image"
             @click="router.push('/category/' + slide.categoryId)"
           />
-          <div class="home-ad-banner-item-content-container" style="color: rgb(250, 255, 255)">
-            <div class="home-ad-banner-item-title-top">{{ slide.description?.[0] }}</div>
-            <div class="home-ad-banner-item-title-middle">{{ slide.description?.[1] }}</div>
-            <div class="home-ad-banner-item-subtitle">{{ slide.description?.[2] }}</div>
+          <div
+            class="home-ad-banner-item-content-container"
+            style="color: rgb(250, 255, 255)"
+          >
+            <div class="home-ad-banner-item-title-top">
+              {{ slide.description?.[0] }}
+            </div>
+            <div class="home-ad-banner-item-title-middle">
+              {{ slide.description?.[1] }}
+            </div>
+            <div class="home-ad-banner-item-subtitle">
+              {{ slide.description?.[2] }}
+            </div>
           </div>
         </el-carousel-item>
       </el-carousel>
     </div>
 
     <!-- 右侧活动位-->
-    <div class="promo-section section" @click="router.push('/category/' + promoBanner.categoryId)">
+    <div
+      class="promo-section section"
+      @click="router.push('/category/' + promoBanner.categoryId)"
+    >
       <div class="promo-banner">
         <img :src="promoBanner.image" class="promo-image" />
         <div class="promo-overlay">
@@ -139,112 +154,129 @@
     <div class="copyright">
       <p class="copyright-text">
         Copyright © 2023 商城系统 版权所有 |
-        <a href="#">关于我们</a> | <a href="#">联系我们</a> | <a href="#">人才招聘</a> |
-        <a href="#">商家入驻</a> | <a href="#">广告服务</a> | <a href="#">手机商城</a> |
+        <a href="#">关于我们</a> | <a href="#">联系我们</a> |
+        <a href="#">人才招聘</a> | <a href="#">商家入驻</a> |
+        <a href="#">广告服务</a> | <a href="#">手机商城</a> |
         <a href="#">友情链接</a>
       </p>
       <p class="record-info">
-        增值电信业务经营许可证：京B2-xxxxxxx | 网络文化经营许可证：京网文[2023]xxxx-xxx号 |
+        增值电信业务经营许可证：京B2-xxxxxxx |
+        网络文化经营许可证：京网文[2023]xxxx-xxx号 |
         违法和不良信息举报电话：400-xxx-xxxx
       </p>
       <p class="record-info">
         京公网安备 xxxxxxxxxxxxx号 |
-        <a href="#">京ICP证xxxxxx号</a> | <a href="#">出版物经营许可证</a> | 营业执照
+        <a href="#">京ICP证xxxxxx号</a> | <a href="#">出版物经营许可证</a> |
+        营业执照
       </p>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import ProductCard from '@/components/ProductCard.vue'
-import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import type { Product } from '@/types'
-import { categories } from '@/types'
-import { getAllProducts } from '@/apis'
-const router = useRouter()
-const isCarouselHovered = ref(false)
+import ProductCard from "@/components/ProductCard.vue";
+import { ref, onMounted, computed } from "vue";
+import { useRouter } from "vue-router";
+import type { Product } from "@/types";
+import { categories } from "@/types";
+import { getAllProducts } from "@/apis";
+import { useUserStore } from "@/stores/user";
+const router = useRouter();
+const isCarouselHovered = ref(false);
+const userStore = useUserStore();
+const currentUserId = computed(() => String(userStore.userInfo.userid || ""));
 
-const allProducts = ref<Product[]>([])
-const displayedProducts = computed(() => allProducts.value.filter((p) => p.status === 'ON_SALE'))
+const allProducts = ref<Product[]>([]);
+const displayedProducts = computed(() =>
+  allProducts.value.filter(
+    (p) =>
+      p.status === "ON_SALE" &&
+      (!currentUserId.value || String(p.sellerid) !== currentUserId.value)
+  )
+);
 
 onMounted(() => {
-  fetchAllProducts()
-})
+  fetchAllProducts();
+});
 // 获取所有商品数据
 const fetchAllProducts = async () => {
   try {
-    const virtualProducts = ref<Product[]>([])
-    const res = await getAllProducts()
+    const virtualProducts = ref<Product[]>([]);
+    const res = await getAllProducts();
     // 支持不同的后端返回封装：
     // - 如果 API 返回 ApiResult<Product[]>（{ code, message, data })：直接用 res.code/res.data
     // - 如果 API 返回 AxiosResponse<ApiResult<Product[]>>：则为 res.data.code/res.data.data
-    const r: unknown = res
-    if (r && typeof r === 'object' && 'code' in r) {
+    const r: unknown = res;
+    if (r && typeof r === "object" && "code" in r) {
       // res 是 ApiResult<Product[]>
-      const api = r as { code?: number; data?: Product[] }
-      virtualProducts.value = api.code === 200 ? api.data || [] : []
-    } else if (r && typeof r === 'object' && 'data' in r) {
+      const api = r as { code?: number; data?: Product[] };
+      virtualProducts.value = api.code === 200 ? api.data || [] : [];
+    } else if (r && typeof r === "object" && "data" in r) {
       // res 可能是 AxiosResponse<ApiResult<Product[]>>
-      const apiContainer = r as { data?: { code?: number; data?: Product[] } }
-      const api = apiContainer.data
-      virtualProducts.value = api?.code === 200 ? api.data || [] : []
+      const apiContainer = r as { data?: { code?: number; data?: Product[] } };
+      const api = apiContainer.data;
+      virtualProducts.value = api?.code === 200 ? api.data || [] : [];
     } else if (Array.isArray(res)) {
       // 直接返回数组的情况
-      virtualProducts.value = res
+      virtualProducts.value = res;
     } else {
-      virtualProducts.value = []
+      virtualProducts.value = [];
     }
-    allProducts.value = virtualProducts.value
+    allProducts.value = virtualProducts.value;
   } catch (error) {
-    console.error('获取商品数据失败:', error)
-    allProducts.value = []
+    console.error("获取商品数据失败:", error);
+    allProducts.value = [];
   }
-}
+};
 
 // 处理轮播图悬停事件
 const handleCarouselHover = (hovered: boolean) => {
-  isCarouselHovered.value = hovered
-}
+  isCarouselHovered.value = hovered;
+};
 
 // 使用通用类型定义的分类常量（含 id 与 name）
 
 // 将首图移至右侧活动位
 const promoBanner = {
-  categoryId: 'home',
-  image: 'https://storage.360buyimg.com/component-libray/images/pc/pc_theme_daily_necessities.png',
-  description: ['智享生活焕新季', '家电狂欢省到底', '爆品直降 限时抢购'],
-}
+  categoryId: "home",
+  image:
+    "https://storage.360buyimg.com/component-libray/images/pc/pc_theme_daily_necessities.png",
+  description: ["智享生活焕新季", "家电狂欢省到底", "爆品直降 限时抢购"],
+};
 
 // 轮播图数据（移除首图）
 const carouselSlides = ref([
   {
-    categoryId: 'electronics',
-    image: 'https://storage.360buyimg.com/component-libray/images/pc/pc_banner_cell_phone.png',
-    description: ['手机焕新季', '正品旗舰放心购', '官方正品 限时直降'],
-  },
-  {
-    categoryId: 'clothing',
-    image: 'https://storage.360buyimg.com/component-libray/images/pc/pc_banner_trendy_clothing.png',
-    description: ['潮流穿搭新势力', '解锁时尚新趋势', '潮服好价 新品折扣'],
-  },
-  {
-    categoryId: 'electronics',
+    categoryId: "electronics",
     image:
-      'https://storage.360buyimg.com/component-libray/images/pc/pc_banner_digital_equipment.png',
-    description: ['潮玩黑科技', '数码3C狂欢盛典', '官方正品 即刻开抢'],
+      "https://storage.360buyimg.com/component-libray/images/pc/pc_banner_cell_phone.png",
+    description: ["手机焕新季", "正品旗舰放心购", "官方正品 限时直降"],
   },
   {
-    categoryId: 'home',
-    image: 'https://storage.360buyimg.com/component-libray/images/pc/pc_banner_home_decoration.png',
-    description: ['大牌家具家装', '点缀品质生活', '正品直降 省钱省心'],
+    categoryId: "clothing",
+    image:
+      "https://storage.360buyimg.com/component-libray/images/pc/pc_banner_trendy_clothing.png",
+    description: ["潮流穿搭新势力", "解锁时尚新趋势", "潮服好价 新品折扣"],
   },
   {
-    categoryId: 'other',
-    image: 'https://storage.360buyimg.com/component-libray/images/pc/pc_banner_snacks.png',
-    description: ['办公轻补给', '宅家追剧能量站', '精选好物 超值优惠'],
+    categoryId: "electronics",
+    image:
+      "https://storage.360buyimg.com/component-libray/images/pc/pc_banner_digital_equipment.png",
+    description: ["潮玩黑科技", "数码3C狂欢盛典", "官方正品 即刻开抢"],
   },
-])
+  {
+    categoryId: "home",
+    image:
+      "https://storage.360buyimg.com/component-libray/images/pc/pc_banner_home_decoration.png",
+    description: ["大牌家具家装", "点缀品质生活", "正品直降 省钱省心"],
+  },
+  {
+    categoryId: "other",
+    image:
+      "https://storage.360buyimg.com/component-libray/images/pc/pc_banner_snacks.png",
+    description: ["办公轻补给", "宅家追剧能量站", "精选好物 超值优惠"],
+  },
+]);
 </script>
 
 <style scoped>
@@ -484,7 +516,7 @@ const carouselSlides = ref([
 }
 
 .product-card-wrap::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;

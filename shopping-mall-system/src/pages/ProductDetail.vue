@@ -4,7 +4,9 @@
     <div class="tb-breadcrumb">
       <el-breadcrumb separator=">">
         <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-        <el-breadcrumb-item>{{ getCategoryLabel(product.category) }}</el-breadcrumb-item>
+        <el-breadcrumb-item>{{
+          getCategoryLabel(product.category)
+        }}</el-breadcrumb-item>
         <el-breadcrumb-item>商品详情</el-breadcrumb-item>
       </el-breadcrumb>
     </div>
@@ -37,12 +39,18 @@
         </div>
 
         <div class="tb-product-service">
-          <el-icon class="tb-icon"><component :is="'Help'"></component></el-icon>
-          <div class="tb-service-info">坏单包退 极速退款 假一赔四 7天无理由退换</div>
+          <el-icon class="tb-icon"
+            ><component :is="'Help'"></component
+          ></el-icon>
+          <div class="tb-service-info">
+            坏单包退 极速退款 假一赔四 7天无理由退换
+          </div>
         </div>
 
         <div class="tb-product-payment">
-          <el-icon class="tb-icon"><component :is="'CreditCard'"></component></el-icon>
+          <el-icon class="tb-icon"
+            ><component :is="'CreditCard'"></component
+          ></el-icon>
           <div class="tb-payment-info">信用卡支付</div>
         </div>
 
@@ -54,13 +62,15 @@
               product.status === 'published' ? 'tb-status-on' : 'tb-status-off',
             ]"
           >
-            {{ product.status === 'ON_SALE' ? '在售' : '已下架' }}
+            {{ product.status === "ON_SALE" ? "在售" : "已下架" }}
           </span>
         </div>
 
         <div class="tb-product-category">
           <span class="tb-category-label">分类</span>
-          <span class="tb-category">{{ getCategoryLabel(product.category) }}</span>
+          <span class="tb-category">{{
+            getCategoryLabel(product.category)
+          }}</span>
         </div>
 
         <div class="tb-product-description">
@@ -71,16 +81,32 @@
         <div class="tb-product-quantity">
           <span class="tb-quantity-label">数量</span>
           <div class="tb-quantity-control">
-            <el-input-number v-model="quantity" :min="1" :max="1" size="default" disabled />
+            <el-input-number
+              v-model="quantity"
+              :min="1"
+              :max="1"
+              size="default"
+              disabled
+            />
             <span class="tb-quantity-unit">件</span>
           </div>
         </div>
         <div class="tb-action-buttons">
-          <el-button type="primary" size="large" class="tb-add-cart" @click="addToCart">
+          <el-button
+            type="primary"
+            size="large"
+            class="tb-add-cart"
+            @click="addToCart"
+          >
             <i class="el-icon-shopping-cart-1"></i>
             加入购物车
           </el-button>
-          <el-button type="primary" size="large" class="tb-buy-now" @click="buyNow">
+          <el-button
+            type="primary"
+            size="large"
+            class="tb-buy-now"
+            @click="buyNow"
+          >
             立即购买
           </el-button>
         </div>
@@ -90,99 +116,101 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { useUserStore } from '@/stores/user'
-import { getProductById, addCartItem } from '@/apis'
-import type { Product } from '@/types/product'
-const userStore = useUserStore()
+import { ref, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { ElMessage } from "element-plus";
+import { useUserStore } from "@/stores/user";
+import { getProductById, addCartItem } from "@/apis";
+import type { Product } from "@/types/product";
+const userStore = useUserStore();
 // 获取路由参数
-const route = useRoute()
-const router = useRouter()
-const quantity = ref(1)
+const route = useRoute();
+const router = useRouter();
+const quantity = ref(1);
 // 商品数据
 const product = ref<Product>({
-  productid: '',
-  sellerid: '',
-  title: '',
-  content: '',
+  productid: "",
+  sellerid: "",
+  title: "",
+  content: "",
   price: 0,
-  photo: '',
-  status: '',
-  publishtime: '',
-  category: '',
-})
+  photo: "",
+  status: "",
+  publishtime: "",
+  category: "",
+});
 
 // 获取商品数据
 const fetchProductData = async () => {
   try {
     // 获取路由中的商品ID
-    const productId = route.params.id
+    const productId = route.params.id;
 
     // 类型检查：确保是字符串
     if (!productId || Array.isArray(productId)) {
-      ElMessage.error('商品ID无效')
-      return
+      ElMessage.error("商品ID无效");
+      return;
     }
-    const res = await getProductById(productId)
-    product.value = res.data.data
+    const res = await getProductById(productId);
+    product.value = res.data.data;
   } catch (error) {
-    ElMessage.error('获取商品信息失败')
-    console.error('获取商品信息失败:', error)
+    ElMessage.error("获取商品信息失败");
+    console.error("获取商品信息失败:", error);
   }
-}
+};
 
 // 商品分类映射
 const categoryMap: Record<string, string> = {
-  electronics: '电子产品',
-  clothing: '服装',
-  books: '图书',
-  home: '家居',
-  other: '其他',
-}
+  electronics: "电子产品",
+  clothing: "服装",
+  books: "图书",
+  home: "家居",
+  other: "其他",
+};
 
 // 获取分类中文名称
 const getCategoryLabel = (value: string) => {
-  return categoryMap[value] || value
-}
+  return categoryMap[value] || value;
+};
 // 加入购物车
 const addToCart = async () => {
-  const userid = userStore.userInfo?.userid
-  const cartid = userStore.cartid
+  const userid = userStore.userInfo?.userid;
+  const cartid = userStore.cartid;
 
   // 添加非空校验
   if (!userid) {
-    ElMessage.warning('请先登录')
-    return
+    ElMessage.warning("请先登录");
+    return;
   }
 
   if (!cartid) {
-    ElMessage.warning('购物车未初始化，请稍后重试')
-    return
+    ElMessage.warning("购物车未初始化，请稍后重试");
+    return;
   }
 
   try {
     await addCartItem(cartid, {
       productid: product.value.productid,
-    })
-    await userStore.fetchCartItems()
-    ElMessage.success('商品已加入购物车')
+    });
+    await userStore.fetchCartItems();
+    ElMessage.success("商品已加入购物车");
   } catch (error) {
-    ElMessage.error('加入购物车失败')
-    console.error('完整错误信息:', error)
+    ElMessage.error("加入购物车失败");
+    console.error("完整错误信息:", error);
   }
-}
+};
 
 // 立即购买
 const buyNow = () => {
-  ElMessage.success('正在前往订单确认页面')
-  router.push(`/payment/${product.value.sellerid}/${product.value.productid}/${quantity.value}`)
-}
+  ElMessage.success("正在前往订单确认页面");
+  router.push(
+    `/payment/${product.value.sellerid}/${product.value.productid}/${quantity.value}`
+  );
+};
 
 onMounted(() => {
-  fetchProductData()
-})
+  fetchProductData();
+});
 </script>
 
 <style scoped>

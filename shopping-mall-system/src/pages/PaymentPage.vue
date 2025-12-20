@@ -14,12 +14,21 @@
             </div>
             <div class="item-details">
               <div class="item-name">{{ productInfo.title }}</div>
-              <div class="item-price">¥{{ productInfo.price }} × {{ quantity }}</div>
+              <div class="item-price">
+                ¥{{ productInfo.price }} × {{ quantity }}
+              </div>
             </div>
-            <div class="item-total">¥{{ (productInfo.price * quantity).toFixed(2) }}</div>
+            <div class="item-total">
+              ¥{{ (productInfo.price * quantity).toFixed(2) }}
+            </div>
           </div>
           <!-- 购物车模式 -->
-          <div class="order-item" v-else v-for="it in cartPayItems" :key="it.productid">
+          <div
+            class="order-item"
+            v-else
+            v-for="it in cartPayItems"
+            :key="it.productid"
+          >
             <div class="item-image">
               <img :src="it.photo" :alt="it.title" />
             </div>
@@ -27,7 +36,9 @@
               <div class="item-name">{{ it.title }}</div>
               <div class="item-price">¥{{ it.price }} × {{ it.quantity }}</div>
             </div>
-            <div class="item-total">¥{{ (it.price * it.quantity).toFixed(2) }}</div>
+            <div class="item-total">
+              ¥{{ (it.price * it.quantity).toFixed(2) }}
+            </div>
           </div>
         </div>
 
@@ -42,7 +53,9 @@
             <el-radio label="balance" border>账户余额</el-radio>
             <el-radio label="credit" border disabled>信用卡(暂未开通)</el-radio>
             <el-radio label="alipay" border disabled>支付宝(暂未开通)</el-radio>
-            <el-radio label="wechat" border disabled>微信支付(暂未开通)</el-radio>
+            <el-radio label="wechat" border disabled
+              >微信支付(暂未开通)</el-radio
+            >
           </el-radio-group>
 
           <div class="account-info" v-if="paymentMethod === 'balance'">
@@ -70,193 +83,219 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { getProductById } from '@/apis/product'
-import { getCartItems } from '@/apis/cart'
-import { createOrder, completeOrder } from '@/apis'
-import { useUserStore } from '@/stores/user'
-import type { CartItemDetail } from '@/types'
+import { ref, onMounted, computed } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { ElMessage } from "element-plus";
+import { getProductById } from "@/apis/product";
+import { getCartItems } from "@/apis/cart";
+import { createOrder, completeOrder, createMessage } from "@/apis";
+import { deleteCartItem } from "@/apis/cart";
+import { useUserStore } from "@/stores/user";
+import type { CartItemDetail } from "@/types";
 
 interface Product {
-  productid: string
-  sellerid: string
-  title: string
-  content: string
-  price: number
-  photo: string
-  status: string
-  publishtime: string
-  category: string
+  productid: string;
+  sellerid: string;
+  title: string;
+  content: string;
+  price: number;
+  photo: string;
+  status: string;
+  publishtime: string;
+  category: string;
 }
 
 // 路由实例
-const route = useRoute()
-const router = useRouter()
+const route = useRoute();
+const router = useRouter();
 
 // 支付状态
-const isPaying = ref(false)
+const isPaying = ref(false);
 
 // 支付方式
-const paymentMethod = ref('balance')
+const paymentMethod = ref("balance");
 
 // 商品数量（单件）
-const quantity = ref(Number(route.params.quantity) || 1)
+const quantity = ref(Number(route.params.quantity) || 1);
 
 // 商品信息（单件）
-const productInfo = ref<Product | null>(null)
+const productInfo = ref<Product | null>(null);
 
 // 购物车模式判断
-const isCartMode = computed(() => !route.params.productid)
+const isCartMode = computed(() => !route.params.productid);
 
 // 选择的商品ID（逗号分隔）
 const selectedIds = computed(() => {
-  const raw = route.query.selected as string | undefined
-  return raw ? raw.split(',').filter(Boolean) : []
-})
+  const raw = route.query.selected as string | undefined;
+  return raw ? raw.split(",").filter(Boolean) : [];
+});
 
 // 购物车商品（多件）
 type CartPayItem = {
-  productid: string
-  sellerid: string
-  title: string
-  price: number
-  photo: string
-  quantity: number
-}
-const cartPayItems = ref<CartPayItem[]>([])
-const userStore = useUserStore()
+  cartitemid: string;
+  productid: string;
+  sellerid: string;
+  title: string;
+  price: number;
+  photo: string;
+  quantity: number;
+};
+const cartPayItems = ref<CartPayItem[]>([]);
+const userStore = useUserStore();
 
 // 返回上一页
 const goBack = () => {
-  router.go(-1)
-}
+  router.go(-1);
+};
 
 // 获取商品信息（单件）
 const fetchProductInfo = async () => {
   try {
-    const productId = route.params.productid as string
+    const productId = route.params.productid as string;
     if (productId) {
-      const res = await getProductById(productId)
-      productInfo.value = res.data.data
+      const res = await getProductById(productId);
+      productInfo.value = res.data.data;
     }
   } catch (error) {
-    ElMessage.error('获取商品信息失败')
-    console.error(error)
+    ElMessage.error("获取商品信息失败");
+    console.error(error);
   }
-}
+};
 
 // 获取购物车商品（多件）
 const fetchCartForPayment = async () => {
   try {
-    const cartid = userStore.cartid
-    if (!cartid) throw new Error('未获取到购物车ID')
-    const res = await getCartItems(cartid)
-    const rows = (res?.data?.data || []) as CartItemDetail[]
+    const cartid = userStore.cartid;
+    if (!cartid) throw new Error("未获取到购物车ID");
+    const res = await getCartItems(cartid);
+    const rows = (res?.data?.data || []) as CartItemDetail[];
     const filtered = selectedIds.value.length
       ? rows.filter((r) => selectedIds.value.includes(r.productid))
-      : rows
+      : rows;
     cartPayItems.value = filtered.map((r) => ({
+      cartitemid: r.cartitemid,
       productid: r.productid,
-      sellerid: String(r.product_sellerid || ''),
-      title: r.product_title || '',
+      sellerid: String(r.product_sellerid || ""),
+      title: r.product_title || "",
       price: r.product_price || 0,
-      photo: r.product_photo || '',
+      photo: r.product_photo || "",
       quantity: 1,
-    }))
+    }));
     if (!cartPayItems.value.length) {
-      ElMessage.warning('未找到要结算的商品')
+      ElMessage.warning("未找到要结算的商品");
     }
   } catch (error) {
-    ElMessage.error('获取购物车商品失败')
-    console.error(error)
+    ElMessage.error("获取购物车商品失败");
+    console.error(error);
   }
-}
+};
 
 // 合计
 const totalAmount = computed(() => {
   if (isCartMode.value) {
-    return cartPayItems.value.reduce((sum, it) => sum + it.price * it.quantity, 0)
+    return cartPayItems.value.reduce(
+      (sum, it) => sum + it.price * it.quantity,
+      0
+    );
   }
-  return productInfo.value ? productInfo.value.price * quantity.value : 0
-})
+  return productInfo.value ? productInfo.value.price * quantity.value : 0;
+});
 
 // 处理支付
 const handlePayment = async () => {
-  if (paymentMethod.value !== 'balance') {
-    ElMessage.warning('目前仅支持账户余额支付')
-    return
+  if (paymentMethod.value !== "balance") {
+    ElMessage.warning("目前仅支持账户余额支付");
+    return;
   }
 
-  isPaying.value = true
+  isPaying.value = true;
   try {
-    const buyerid = userStore.userInfo.userid
-    if (!buyerid) throw new Error('未登录或缺少用户信息')
+    const buyerid = userStore.userInfo.userid;
+    if (!buyerid) throw new Error("未登录或缺少用户信息");
 
     if (isCartMode.value) {
-      // 多件：逐件下单并完成
-      const created: Array<{ orderid?: string }> = []
+      // 多件：逐件下单，isdone 默认 0；创建后给卖家发系统消息
       for (const it of cartPayItems.value) {
-        if (!it.sellerid || !it.productid) continue
+        if (!it.sellerid || !it.productid) continue;
         const res = await createOrder(buyerid, {
           sellerid: it.sellerid,
           productid: it.productid,
-        })
-        if (res.data?.code !== 200) throw new Error(res.data?.message || '下单失败')
-        created.push({ orderid: res.data?.data?.orderid })
+        });
+        if (res.data?.code !== 200)
+          throw new Error(res.data?.message || "下单失败");
+        const orderid = res.data?.data?.orderid;
+        if (orderid) {
+          // 系统消息：带 ORDER_ID: 前缀便于卖家端解析
+          await createMessage(String(buyerid), {
+            receiverid: String(it.sellerid),
+            type: "system",
+            title: "新的订单通知",
+            content: `您有新的订单，商品: ${it.title}，订单号: ${orderid}，ORDER_ID:${orderid}`,
+          });
+        }
       }
-      for (const o of created) {
-        if (!o.orderid) continue
-        const payRes = await completeOrder(o.orderid)
-        if (payRes.data?.code !== 200) throw new Error(payRes.data?.message || '支付失败')
-      }
-      ElMessage.success('支付成功！')
+      ElMessage.success("支付成功！");
+      // 仅移除已购买的购物车项，不清空整个购物车
       try {
-        await userStore.clearCartItems?.()
-      } catch {}
-      router.push({ path: '/payment-success' })
+        const ids = cartPayItems.value
+          .map((it) => it.cartitemid)
+          .filter(Boolean);
+        await Promise.all(ids.map((id) => deleteCartItem(String(id))));
+        await userStore.fetchCartItems?.();
+      } catch (err) {
+        console.warn("移除已结算购物车项失败", err);
+      }
+      router.push({ path: "/payment-success" });
     } else {
       // 单件
       if (!productInfo.value) {
-        ElMessage.warning('商品信息加载中，请稍候...')
-        return
+        ElMessage.warning("商品信息加载中，请稍候...");
+        return;
       }
-      const sellerid = String(route.params.sellerid || productInfo.value.sellerid)
-      const productid = String(route.params.productid || productInfo.value.productid)
-      const res = await createOrder(buyerid, { sellerid, productid })
-      if (res.data?.code !== 200) throw new Error(res.data?.message || '下单失败')
-      const orderid = res.data?.data?.orderid
+      const sellerid = String(
+        route.params.sellerid || productInfo.value.sellerid
+      );
+      const productid = String(
+        route.params.productid || productInfo.value.productid
+      );
+      const res = await createOrder(buyerid, { sellerid, productid });
+      if (res.data?.code !== 200)
+        throw new Error(res.data?.message || "下单失败");
+      const orderid = res.data?.data?.orderid;
       if (orderid) {
-        const payRes = await completeOrder(orderid)
-        if (payRes.data?.code !== 200) throw new Error(payRes.data?.message || '支付失败')
+        await createMessage(String(buyerid), {
+          receiverid: String(sellerid),
+          type: "system",
+          title: "新的订单通知",
+          content: `您有新的订单，商品: ${productInfo.value.title}，订单号: ${orderid}，ORDER_ID:${orderid}`,
+        });
       }
-      ElMessage.success('支付成功！')
+      ElMessage.success("支付成功！");
       router.push({
-        path: '/payment-success',
+        path: "/payment-success",
         query: {
           sellerid,
           productid,
           quantity: String(quantity.value),
         },
-      })
+      });
     }
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : '支付失败，请稍后重试'
-    ElMessage.error(msg)
+    const msg = e instanceof Error ? e.message : "支付失败，请稍后重试";
+    ElMessage.error(msg);
   } finally {
-    isPaying.value = false
+    isPaying.value = false;
   }
-}
+};
 
 // 页面加载时获取商品信息
 onMounted(() => {
   if (isCartMode.value) {
-    fetchCartForPayment()
+    fetchCartForPayment();
   } else {
-    fetchProductInfo()
+    fetchProductInfo();
   }
-})
+});
 </script>
 
 <style scoped>
