@@ -18,7 +18,10 @@
         >
           <template #suffix>
             <el-button type="primary" link @click="handleSearch">
-              <Search class="icon-search" style="width: 1em; height: 1em; margin-right: 6px" />
+              <Search
+                class="icon-search"
+                style="width: 1em; height: 1em; margin-right: 6px"
+              />
             </el-button>
           </template>
         </el-input>
@@ -56,7 +59,7 @@
             class="cart-btn"
             @click="
               () => {
-                ;(router.push('/cart'), (activeName = ''))
+                (router.push('/cart'), (activeName = ''));
               }
             "
           >
@@ -69,121 +72,120 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, watch, computed } from 'vue'
-import { User, ShoppingCart, Search } from '@element-plus/icons-vue'
-import type { TabsPaneContext } from 'element-plus'
-import { useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user'
-import { ElMessageBox, ElMessage } from 'element-plus'
-import { useRoute } from 'vue-router'
-const searchInput = ref('')
-const activeName = ref('first')
-const router = useRouter()
-const route = useRoute()
-const userStore = useUserStore()
+import { onMounted, ref, watch, computed } from "vue";
+import { User, ShoppingCart, Search } from "@element-plus/icons-vue";
+import type { TabsPaneContext } from "element-plus";
+import { useRouter } from "vue-router";
+import { useUserStore } from "@/stores/user";
+import { ElMessageBox, ElMessage } from "element-plus";
+import { useRoute } from "vue-router";
+const searchInput = ref("");
+const activeName = ref("first");
+const router = useRouter();
+const route = useRoute();
+const userStore = useUserStore();
 const cartCount = computed(() => {
-  return userStore.isLoggedIn ? userStore.cartCount : 0
-})
+  return userStore.isLoggedIn ? userStore.cartCount : 0;
+});
 
 //获取当前tab高亮
 const getActiveName = () => {
-  const path = router.currentRoute.value.path
+  const path = router.currentRoute.value.path;
   switch (path) {
-    case '/':
-      activeName.value = 'first'
-      break
-    case '/message':
-      activeName.value = 'second'
-      break
-    case '/profile':
-      activeName.value = 'third'
-      break
-    case '/publish':
-      activeName.value = 'fourth'
-      break
+    case "/":
+      activeName.value = "first";
+      break;
+    case "/message":
+      activeName.value = "second";
+      break;
+    case "/profile":
+      activeName.value = "third";
+      break;
+    case "/publish":
+      activeName.value = "fourth";
+      break;
     default:
       // 任何非主导航页面都取消高亮
-      activeName.value = ''
+      activeName.value = "";
   }
-}
+};
 
 // 在组件挂载时获取购物车数据
 onMounted(async () => {
-  getActiveName()
+  getActiveName();
 
   // 如果用户已登录，则获取购物车数据
   if (userStore.isLoggedIn) {
-    await userStore.fetchCartItems()
+    await userStore.fetchCartItems();
   }
-})
+});
 
 // 监听用户登录状态变化，如果登录则获取购物车数据
 watch(
   () => userStore.isLoggedIn,
   async (isLoggedIn) => {
     if (isLoggedIn) {
-      await userStore.fetchCartItems()
+      await userStore.fetchCartItems();
     }
-  },
-)
+  }
+);
 
 // 监听路由变化（包含前进/后退），同步 tab 高亮
 watch(
   () => route.path,
   () => {
-    getActiveName()
-  },
-)
+    getActiveName();
+  }
+);
 
 const handleClick = (tab: TabsPaneContext) => {
-  const tabName = tab.props.name
+  const tabName = tab.props.name;
   switch (tabName) {
-    case 'first':
-      router.push('/')
-      break
-    case 'second':
-      router.push('/message')
-      break
-    case 'third':
-      router.push('/profile')
-      break
-    case 'fourth':
-      router.push('/publish')
-      break
+    case "first":
+      router.push("/");
+      break;
+    case "second":
+      router.push("/message");
+      break;
+    case "third":
+      router.push("/profile");
+      break;
+    case "fourth":
+      router.push("/publish");
+      break;
   }
-}
+};
 
 const handleSearch = () => {
-  const key = searchInput.value.trim()
-  router.push({ path: '/search', query: { key } })
-  searchInput.value = ''
-}
+  const key = searchInput.value.trim();
+  router.push({ path: "/search", query: { key } });
+};
 
 // 处理用户下拉菜单命令
 const handleUserCommand = (command: string) => {
   switch (command) {
-    case 'profile':
-      router.push('/profile')
-      break
-    case 'logout':
+    case "profile":
+      router.push("/profile");
+      break;
+    case "logout":
       // 添加退出登录确认提示
-      ElMessageBox.confirm('确定要退出登录吗？', '退出登录', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning',
+      ElMessageBox.confirm("确定要退出登录吗？", "退出登录", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
       })
         .then(() => {
           // 确认退出登录
-          userStore.clearUserInfo()
-          ElMessage.success('已退出登录')
-          router.push('/')
+          userStore.clearUserInfo();
+          ElMessage.success("已退出登录");
+          router.push("/");
         })
         .catch(() => {
           // 取消退出登录
-        })
-      break
+        });
+      break;
   }
-}
+};
 </script>
 
 <style scoped>

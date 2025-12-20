@@ -188,11 +188,13 @@ const currentUserId = computed(() => String(userStore.userInfo.userid || ""));
 
 const allProducts = ref<Product[]>([]);
 const displayedProducts = computed(() =>
-  allProducts.value.filter(
-    (p) =>
-      p.status === "ON_SALE" &&
-      (!currentUserId.value || String(p.sellerid) !== currentUserId.value)
-  )
+  allProducts.value
+    .filter(
+      (p) =>
+        p.status === "ON_SALE" &&
+        (!currentUserId.value || String(p.sellerid) !== currentUserId.value)
+    )
+    .slice(0, 24)
 );
 
 onMounted(() => {
