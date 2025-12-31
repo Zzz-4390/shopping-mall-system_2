@@ -1,6 +1,7 @@
 //导入prisma客户端
 const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient() // 必须实例化！
+
 const { v4: uuidv4 } = require('uuid')
 
 //新增（注册）用户
@@ -17,9 +18,11 @@ exports.registUser = async (req, res) => {
                 message: '缺少必填字段'
             })
         };
-        // 这里实际上返回的是一个对象，而不是一个boolean
-        const isExist = await prisma.users.findUnique({ where: { phone } })
-        if (isExist) {
+        // 检查账号是否已存在
+        const isExist = await prisma.$queryRaw`
+            SELECT userid FROM users WHERE phone = ${phone}
+        `
+        if (isExist && isExist.length > 0) {
             return res.status(400).json({
                 code: 400,
                 message: '账号已存在'
@@ -28,20 +31,22 @@ exports.registUser = async (req, res) => {
 
         // 只需创建用户，购物车由数据库触发器自动创建
         const newuserid = uuidv4()
-        const newUser = await prisma.users.create({
-            data: {
-                userid: newuserid,
-                phone,
-                password,
-                name: phone.slice(-4),
-                registertime: new Date()
-            }
-        })
+        const now = new Date()
+        await prisma.$executeRaw`
+            INSERT INTO users (userid, phone, password, name, registertime)
+            VALUES (${newuserid}, ${phone}, ${password}, ${phone.slice(-4)}, ${now})
+        `
+
+        // 查询插入的用户数据
+        const newUser = await prisma.$queryRaw`
+            SELECT userid, phone, password, name, photo, registertime
+            FROM users WHERE userid = ${newuserid}
+        `
 
         res.status(200).json({
             code: 200,
             message: '新增用户成功（购物车由触发器自动创建）',
-            data: newUser
+            data: newUser[0]
         })
     } catch (err) {
         console.error('新增用户失败:', err)
@@ -64,21 +69,31 @@ exports.getuser = async (req, res) => {
             })
         }
 
-        const user = await prisma.users.findMany({
-            where: {
-                userid
-            }
-        })
+        const user = await prisma.$queryRaw`
+            SELECT userid, phone, password, name, photo, registertime
+            FROM users WHERE userid = ${userid}
+        `
         if (user.length === 0) {
             return res.status(400).json({
                 code: 400,
                 message: '用户不存在'
             })
         }
+
+        // 查询用户的购物车信息
+        const cart = await prisma.$queryRaw`
+            SELECT cartid, cartuserid
+            FROM cart
+            WHERE cartuserid = ${userid}
+        `
+
         res.status(200).json({
             code: 200,
             message: '查询用户成功',
-            data: user
+            data: [{
+                ...user[0],
+                cart: cart || []
+            }]
         })
 
     } catch (err) {
@@ -98,8 +113,11 @@ exports.updateUser = async (req, res) => {
         const { userid } = req.params
         const { photo, name, password, oldPassword } = req.body
 
-        const user = await prisma.users.findUnique({ where: { userid } })
-        if (!user) {
+        // 查询用户是否存在
+        const userCheck = await prisma.$queryRaw`
+            SELECT userid, password FROM users WHERE userid = ${userid}
+        `
+        if (!userCheck || userCheck.length === 0) {
             return res.status(400).json({
                 code: 400,
                 message: '用户不存在'
@@ -108,7 +126,7 @@ exports.updateUser = async (req, res) => {
 
         // 如果要更新密码，需要验证旧密码
         if (password && oldPassword) {
-            if (user.password !== oldPassword) {
+            if (userCheck[0].password !== oldPassword) {
                 return res.status(400).json({
                     code: 400,
                     message: '当前密码错误'
@@ -116,22 +134,29 @@ exports.updateUser = async (req, res) => {
             }
         }
 
-        // 构建更新数据，只包含提供的字段
+        // 使用参数化查询进行更新
         const updateData = {}
-        if (photo !== undefined) updateData.photo = photo
+        if (photo !== undefined) updateData.photo = photo || null
         if (name !== undefined) updateData.name = name
         if (password !== undefined) updateData.password = password
 
-        const updateUser = await prisma.users.update({
-            where: {
-                userid
-            },
-            data: updateData
-        })
+        if (Object.keys(updateData).length > 0) {
+            await prisma.users.update({
+                where: { userid: userid },
+                data: updateData
+            })
+        }
+
+        // 查询更新后的用户
+        const updateUser = await prisma.$queryRaw`
+            SELECT userid, phone, password, name, photo, registertime
+            FROM users WHERE userid = ${userid}
+        `
+
         res.status(200).json({
             code: 200,
             message: '更新用户成功',
-            data: updateUser
+            data: updateUser[0]
         })
 
     } catch (err) {
@@ -155,33 +180,46 @@ exports.loginUser = async (req, res) => {
                 message: '缺少必填字段'
             })
         };
-        const user = await prisma.users.findUnique({
-            where: { phone },
-            include: {
-                cart: true  // 包含购物车信息
-            }
-        })
+
+        // 查询用户信息
+        const user = await prisma.$queryRaw`
+            SELECT u.userid, u.phone, u.password, u.name, u.photo, u.registertime
+            FROM users u
+            WHERE u.phone = ${phone}
+       `
+
         // 先判断账号是否存在
-        if (!user) {
+        if (!user || user.length === 0) {
             return res.status(400).json({
                 code: 400,
                 message: '账号不存在'
             })
         }
+
         // 再判断密码是否正确
-        if (user.password !== password) {
+        if (user[0].password !== password) {
             return res.status(400).json({
                 code: 400,
                 message: '密码错误'
             })
         }
 
+        // 查询用户的购物车信息
+        const cart = await prisma.$queryRaw`
+            SELECT cartid, cartuserid
+            FROM cart
+            WHERE cartuserid = ${user[0].userid}
+        `
+
         //都没问题了，返回登录成功信息
         console.log('登录成功')
         res.status(200).json({
             code: 200,
             message: '登录成功',
-            data: user
+            data: {
+                ...user[0],
+                cart: cart || []
+            }
         })
     } catch (err) {
         console.error('登录失败:', err.message)

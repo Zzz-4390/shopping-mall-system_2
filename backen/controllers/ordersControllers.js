@@ -12,20 +12,23 @@ exports.createOrder = async (req, res) => {
         const { sellerid, productid } = req.body
 
         // 只需创建订单，商品状态由触发器自动更新
-        const createdOrder = await prisma.orders.create({
-            data: {
-                orderid: uuidv4(),
-                buyerid,
-                sellerid,
-                productid,
-                createtime: new Date()
-            }
-        })
+        const orderid = uuidv4()
+        const now = new Date()
+        await prisma.$executeRaw`
+            INSERT INTO orders (orderid, buyerid, sellerid, productid, createtime, isdone)
+            VALUES (${orderid}, ${buyerid}, ${sellerid}, ${productid}, ${now}, false)
+        `
+
+        // 查询插入的订单数据
+        const createdOrder = await prisma.$queryRaw`
+            SELECT orderid, buyerid, sellerid, productid, createtime, finishtime, isdone
+            FROM orders WHERE orderid = ${orderid}
+        `
 
         res.status(200).json({
             code: 200,
             message: '创建订单成功（商品状态由触发器自动更新）',
-            data: createdOrder
+            data: createdOrder[0]
         })
     } catch (err) {
         console.error('创建订单失败:', err)
@@ -44,19 +47,29 @@ exports.completeOrder = async (req, res) => {
         const { orderid } = req.params
 
         // 根据订单号查询到商品id
-        const order = await prisma.orders.findUnique({ where: { orderid } })
-        if (!order) throw new Error('订单不存在')
+        const order = await prisma.$queryRaw`
+            SELECT orderid FROM orders WHERE orderid = ${orderid}
+        `
+        if (!order || order.length === 0) throw new Error('订单不存在')
 
         // 只需更新订单状态，商品状态由触发器自动更新
-        const updatedOrder = await prisma.orders.update({
-            where: { orderid },
-            data: { isdone: true, finishtime: new Date() }
-        })
+        const now = new Date()
+        await prisma.$executeRaw`
+            UPDATE orders
+            SET isdone = true, finishtime = ${now}
+            WHERE orderid = ${orderid}
+        `
+
+        // 查询更新后的订单
+        const updatedOrder = await prisma.$queryRaw`
+            SELECT orderid, buyerid, sellerid, productid, createtime, finishtime, isdone
+            FROM orders WHERE orderid = ${orderid}
+        `
 
         res.status(200).json({
             code: 200,
             message: '完成订单成功（商品状态由触发器自动更新）',
-            data: updatedOrder
+            data: updatedOrder[0]
         })
     } catch (err) {
         console.error('完成订单失败:', err)

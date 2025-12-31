@@ -26,25 +26,25 @@ exports.createProduct = async (req, res) => {
             })
         }
 
-        //4. 调用 Prisma 创建商品（publishtime 由数据库默认生成，无需手动传递）
-        const newProduct = await prisma.product.create({
-            data: {
-                productid: uuidv4(),
-                sellerid,
-                title,
-                content,
-                price: Number(price),
-                photo: photoUrl,
-                status: PRODUCT_STATUS.ON_SALE,
-                category,
-            }
-        })
+        //4. 使用原生SQL创建商品（publishtime 由数据库默认生成，无需手动传递）
+        const newProductId = uuidv4()
+        const now = new Date()
+        const result = await prisma.$executeRaw`
+            INSERT INTO product (productid, sellerid, title, content, price, photo, status, publishtime, category)
+            VALUES (${newProductId}, ${sellerid}, ${title}, ${content}, ${price}, ${photo}, ${PRODUCT_STATUS.ON_SALE}, ${now}, ${category})
+        `
+
+        // 查询插入的商品数据
+        const newProduct = await prisma.$queryRaw`
+            SELECT productid, sellerid, title, content, price, photo, status, publishtime, category
+            FROM product WHERE productid = ${newProductId}
+        `
 
         //5. 返回创建成功的商品信息
         res.status(200).json({
             code: 200,
             message: '商品创建成功',
-            data: newProduct
+            data: newProduct[0]
         })
     } catch (err) {
         console.error('商品创建失败:', err)
@@ -55,10 +55,12 @@ exports.createProduct = async (req, res) => {
         })
     }
 }
-
 exports.getAllProduct = async (req, res) => {
     try {
-        const allProduct = await prisma.product.findMany()
+        const allProduct = await prisma.$queryRaw`
+            SELECT productid, sellerid, title, content, price, photo, status, publishtime, category
+            FROM product
+        `
         res.status(200).json({
             code: 200,
             message: '获取所有商品成功',
@@ -80,10 +82,10 @@ exports.deleteProduct = async (req, res) => {
         const { productid } = req.params
 
         // 验证商品是否存在
-        const existingProduct = await prisma.product.findUnique({
-            where: { productid }
-        })
-        if (!existingProduct) {
+        const existingProduct = await prisma.$queryRaw`
+            SELECT productid FROM product WHERE productid = ${productid}
+        `
+        if (!existingProduct || existingProduct.length === 0) {
             return res.status(404).json({
                 code: 404,
                 message: '商品不存在'
@@ -94,13 +96,9 @@ exports.deleteProduct = async (req, res) => {
         // 注意：订单记录通常保留（不删除），仅删除购物车关联
         await prisma.$transaction([
             // 1. 删除该商品在所有购物车中的记录
-            prisma.cartitem.deleteMany({
-                where: { productid }
-            }),
+            prisma.$executeRaw`DELETE FROM cartitem WHERE productid = ${productid}`,
             // 2. 删除商品本身
-            prisma.product.delete({
-                where: { productid }
-            })
+            prisma.$executeRaw`DELETE FROM product WHERE productid = ${productid}`
         ])
 
         res.status(200).json({
@@ -123,30 +121,44 @@ exports.getProductById = async (req, res) => {
     try {
         const { productid } = req.params
 
-        const product = await prisma.product.findUnique({
-            where: { productid },
-            include: {
-                users: {
-                    select: {
-                        userid: true,
-                        name: true,
-                        photo: true
-                    }
-                }
-            }
-        })
+        const product = await prisma.$queryRaw`
+            SELECT p.productid, p.sellerid, p.title, p.content, p.price, p.photo, p.status, p.publishtime, p.category,
+                   u.userid, u.name, u.photo as user_photo
+            FROM product p
+            LEFT JOIN users u ON p.sellerid = u.userid
+            WHERE p.productid = ${productid}
+        `
 
-        if (!product) {
+        if (!product || product.length === 0) {
             return res.status(404).json({
                 code: 404,
                 message: '商品不存在'
             })
         }
 
+        // 重新组织数据结构以匹配原始Prisma返回格式
+        const result = product[0]
+        const formattedProduct = {
+            productid: result.productid,
+            sellerid: result.sellerid,
+            title: result.title,
+            content: result.content,
+            price: result.price,
+            photo: result.photo,
+            status: result.status,
+            publishtime: result.publishtime,
+            category: result.category,
+            users: {
+                userid: result.userid,
+                name: result.name,
+                photo: result.user_photo
+            }
+        }
+
         res.status(200).json({
             code: 200,
             message: '获取商品详情成功',
-            data: product
+            data: formattedProduct
         })
     } catch (err) {
         console.error('获取商品详情失败:', err)
@@ -163,12 +175,12 @@ exports.getProductBySeller = async (req, res) => {
     try {
         const { sellerid } = req.params
 
-        const products = await prisma.product.findMany({
-            where: { sellerid },
-            orderBy: {
-                publishtime: 'desc'
-            }
-        })
+        const products = await prisma.$queryRaw`
+            SELECT productid, sellerid, title, content, price, photo, status, publishtime, category
+            FROM product
+            WHERE sellerid = ${sellerid}
+            ORDER BY publishtime DESC
+        `
 
         res.status(200).json({
             code: 200,
@@ -190,15 +202,12 @@ exports.getProductByCategory = async (req, res) => {
     try {
         const { category } = req.params
 
-        const products = await prisma.product.findMany({
-            where: {
-                category,
-                status: 'ON_SALE' // 只返回在售商品
-            },
-            orderBy: {
-                publishtime: 'desc'
-            }
-        })
+        const products = await prisma.$queryRaw`
+            SELECT productid, sellerid, title, content, price, photo, status, publishtime, category
+            FROM product
+            WHERE category = ${category} AND status = 'ON_SALE'
+            ORDER BY publishtime DESC
+        `
 
         res.status(200).json({
             code: 200,
@@ -214,6 +223,7 @@ exports.getProductByCategory = async (req, res) => {
         })
     }
 }
+
 
 exports.updateProduct = async (req, res) => {
     try {
@@ -236,21 +246,28 @@ exports.updateProduct = async (req, res) => {
             })
         }
 
-        // 构建更新数据对象，只包含传入的字段
+        // 使用参数化查询进行更新
         const updateData = {}
         if (price !== undefined) updateData.price = price
         if (status !== undefined) updateData.status = status
 
-        // 调用 Prisma 更新商品
-        const updateProduct = await prisma.product.update({
-            where: { productid },
-            data: updateData
-        })
+        if (Object.keys(updateData).length > 0) {
+            await prisma.product.update({
+                where: { productid: productid },
+                data: updateData
+            })
+        }
+
+        // 查询更新后的商品
+        const updateProduct = await prisma.$queryRaw`
+            SELECT productid, sellerid, title, content, price, photo, status, publishtime, category
+            FROM product WHERE productid = ${productid}
+        `
 
         res.status(200).json({
             code: 200,
             message: '更新商品成功',
-            data: updateProduct
+            data: updateProduct[0]
         })
 
     } catch (err) {
@@ -262,4 +279,6 @@ exports.updateProduct = async (req, res) => {
         })
     }
 }
+
+
 
